@@ -36,6 +36,14 @@
         ></WeTable>
       </TabPane>
     </Tabs>
+    <Modal v-model="networkSegmentModalVisible" title="快速生成网段" fullscreen>
+      <NetworkSegmentInput
+        v-if="networkSegmentModalVisible"
+      ></NetworkSegmentInput>
+      <div slot="footer">
+        <Button @click="networkSegmentModalVisible = false">取消</Button>
+      </div>
+    </Modal>
   </div>
 </template>
 <script>
@@ -51,7 +59,8 @@ import {
   createCiDatas,
   updateCiDatas,
   getEnumCodesByCategoryId,
-  operateCiState
+  operateCiState,
+  retrieveCiTypes
 } from "@/api/server";
 import { setHeaders } from "@/api/base.js";
 import {
@@ -62,8 +71,12 @@ import {
 } from "@/const/actions.js";
 import { formatData } from "../util/format.js";
 import { getExtraInnerActions } from "../util/state-operations.js";
+import NetworkSegmentInput from "../components/network-segment-input";
 const defaultCiTypePNG = require("@/assets/ci-type-default.png");
 export default {
+  components: {
+    NetworkSegmentInput
+  },
   data() {
     return {
       tabList: [],
@@ -79,7 +92,9 @@ export default {
       source: {},
       layers: [],
       graph: {},
-      ciTypesName: {}
+      ciTypesName: {},
+      networkSegmentId: 0,
+      networkSegmentModalVisible: false
     };
   },
   computed: {
@@ -103,6 +118,20 @@ export default {
     handleTabClick(name) {
       this.payload.filters = [];
       this.currentTab = name;
+    },
+    async getNetworkSegmentId() {
+      const { status, message, data } = await retrieveCiTypes({
+        filters: [
+          {
+            name: "tableName",
+            operator: "eq",
+            value: "network_segment"
+          }
+        ]
+      });
+      if (status === "OK") {
+        this.networkSegmentId = data.contents[0].ciTypeId;
+      }
     },
     async initGraph(filters = ["created", "dirty"]) {
       var origin;
@@ -337,6 +366,16 @@ export default {
         }
         const found = this.tabList.find(_ => _.id === g.id);
         if (!found) {
+          const importButton = [
+            {
+              label: "快速录入网段",
+              props: {
+                type: "primary",
+                icon: "ios-cog"
+              },
+              actionType: "networkSegmentInput"
+            }
+          ];
           const ci = {
             name: nodeName,
             id: g.id,
@@ -344,6 +383,8 @@ export default {
             outerActions:
               this.$route.name === "ciDataEnquiry"
                 ? null
+                : +g.id === this.networkSegmentId
+                ? JSON.parse(JSON.stringify(outerActions)).concat(importButton)
                 : JSON.parse(JSON.stringify(outerActions)),
             innerActions:
               this.$route.name === "ciDataEnquiry"
@@ -439,6 +480,9 @@ export default {
           break;
         case "innerCancel":
           this.$refs[this.tableRef][0].rowCancelHandler(data.weTableRowId);
+          break;
+        case "networkSegmentInput":
+          this.networkSegmentInput();
           break;
         default:
           this.defaultHandler(type, data);
@@ -664,6 +708,10 @@ export default {
         });
       }
     },
+    networkSegmentInput() {
+      // TODO
+      this.networkSegmentModalVisible = true;
+    },
     pageChange(current) {
       this.tabList.forEach(ci => {
         if (ci.id === this.currentTab) {
@@ -773,6 +821,7 @@ export default {
     }
   },
   mounted() {
+    this.getNetworkSegmentId();
     this.initGraph();
   }
 };
